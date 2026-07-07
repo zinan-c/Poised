@@ -1,0 +1,8 @@
+services:
+  poised:
+    build: .
+    command: ["-config", "configs/poised.example.json"]
+    environment:
+      POISED_HTTP_ADDR: "0.0.0.0:8080"
+    ports:
+      - "8080:8080"

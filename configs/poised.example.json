@@ -1,0 +1,34 @@
+{
+  "http": {
+    "addr": "127.0.0.1:8080"
+  },
+  "scheduler": {
+    "run_on_start": true
+  },
+  "jobs": [
+    {
+      "id": "example-echo",
+      "name": "Example echo adapter",
+      "adapter": "echo",
+      "enabled": true,
+      "interval": "30s",
+      "timeout": "10s",
+      "payload": {
+        "message": "poised is running"
+      }
+    },
+    {
+      "id": "example-http-check",
+      "name": "Example HTTP health check",
+      "adapter": "http_check",
+      "enabled": false,
+      "interval": "1m",
+      "timeout": "10s",
+      "payload": {
+        "url": "https://example.com",
+        "method": "GET",
+        "expected_status": 200
+      }
+    }
+  ]
+}

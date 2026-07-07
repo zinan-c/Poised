@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Go
+bin/
+coverage.out
+
+# Local runtime data
+data/
+tmp/
+
+# Editor
+.idea/
+.vscode/
