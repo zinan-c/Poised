@@ -10,6 +10,8 @@ coverage.out
 # Local runtime data
 data/
 tmp/
+WORKING_LOG.md
+internal/adapters/*/DEV_GUIDE.md
 
 # Editor
 .idea/
