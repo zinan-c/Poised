@@ -29,6 +29,54 @@
         "method": "GET",
         "expected_status": 200
       }
+    },
+    {
+      "id": "example-ceair-fare",
+      "name": "Example China Eastern fare monitor",
+      "adapter": "ceair",
+      "enabled": false,
+      "interval": "10m",
+      "timeout": "20s",
+      "payload": {
+        "route_name": "sha-bjs-2026-07-09",
+        "language_code": "zh",
+        "currency_code": "USD",
+        "route_type": "OW",
+        "dep_city_code": "SHA",
+        "dep_code": ["SHA", "PVG"],
+        "dep_station_code": [],
+        "arr_city_code": "BJS",
+        "arr_code": ["PEK", "PKX"],
+        "arr_station_code": ["QIP", "BXP", "VNP", "FTP", "VAP", "BJP", "IWP"],
+        "dep_date": "2026-07-09",
+        "adult_count": 1,
+        "child_count": 0,
+        "infant_count": 0,
+        "only_plane_flag": false,
+        "cabin_level": ""
+      }
+    },
+    {
+      "id": "example-csair-fare",
+      "name": "Example China Southern fare monitor",
+      "adapter": "csair",
+      "enabled": false,
+      "interval": "10m",
+      "timeout": "20s",
+      "payload": {
+        "route_name": "sha-bjs-2026-07-08",
+        "language": "zh",
+        "route_type": "S",
+        "dep_city_code": "SHA",
+        "dep_airport_codes": ["SHA", "PVG"],
+        "arr_city_code": "BJS",
+        "arr_airport_codes": ["PEK", "PKX"],
+        "dep_date": "2026-07-08",
+        "adult_count": 1,
+        "child_count": 0,
+        "infant_count": 0,
+        "order_channel": "JPSS-YDXC"
+      }
     }
   ]
 }

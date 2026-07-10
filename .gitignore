@@ -11,7 +11,7 @@ coverage.out
 data/
 tmp/
 WORKING_LOG.md
-internal/adapters/*/DEV_GUIDE.md
+internal/adapters/**/DEV_GUIDE.md
 
 # Editor
 .idea/

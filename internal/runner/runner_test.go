@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/zinan-c/Poised/internal/adapters"
-	"github.com/zinan-c/Poised/internal/adapters/echo"
+	"github.com/zinan-c/Poised/internal/adapters/examples/echo"
 	"github.com/zinan-c/Poised/internal/core"
 	"github.com/zinan-c/Poised/internal/store"
 )

@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/zinan-c/Poised/internal/adapters"
-	"github.com/zinan-c/Poised/internal/adapters/echo"
+	"github.com/zinan-c/Poised/internal/adapters/airfare/ceair"
+	"github.com/zinan-c/Poised/internal/adapters/airfare/csair"
+	"github.com/zinan-c/Poised/internal/adapters/examples/echo"
 	"github.com/zinan-c/Poised/internal/adapters/httpcheck"
 	"github.com/zinan-c/Poised/internal/api"
 	"github.com/zinan-c/Poised/internal/config"
@@ -35,6 +37,8 @@ func main() {
 	registry := adapters.NewRegistry()
 	mustRegister(logger, registry, echo.New())
 	mustRegister(logger, registry, httpcheck.New())
+	mustRegister(logger, registry, ceair.New())
+	mustRegister(logger, registry, csair.New())
 
 	runStore := store.NewMemoryRunStore()
 	jobRunner := runner.New(registry, runStore, logger)
