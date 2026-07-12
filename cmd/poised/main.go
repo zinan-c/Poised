@@ -13,6 +13,7 @@ import (
 	"github.com/zinan-c/Poised/internal/adapters"
 	"github.com/zinan-c/Poised/internal/adapters/airfare/ceair"
 	"github.com/zinan-c/Poised/internal/adapters/airfare/csair"
+	"github.com/zinan-c/Poised/internal/adapters/airfare/springair"
 	"github.com/zinan-c/Poised/internal/adapters/examples/echo"
 	"github.com/zinan-c/Poised/internal/adapters/httpcheck"
 	"github.com/zinan-c/Poised/internal/api"
@@ -39,6 +40,7 @@ func main() {
 	mustRegister(logger, registry, httpcheck.New())
 	mustRegister(logger, registry, ceair.New())
 	mustRegister(logger, registry, csair.New())
+	mustRegister(logger, registry, springair.New())
 
 	runStore := store.NewMemoryRunStore()
 	jobRunner := runner.New(registry, runStore, logger)

@@ -77,6 +77,29 @@
         "infant_count": 0,
         "order_channel": "JPSS-YDXC"
       }
+    },
+    {
+      "id": "example-springair-fare",
+      "name": "Example Spring Airlines fare monitor",
+      "adapter": "springair",
+      "enabled": false,
+      "interval": "10m",
+      "timeout": "20s",
+      "payload": {
+        "route_name": "sha-can-2026-07-10",
+        "departure": "Shanghai",
+        "arrival": "Guangzhou",
+        "dep_city_code": "SHA",
+        "arr_city_code": "CAN",
+        "dep_airport_code": "",
+        "arr_airport_code": "",
+        "dep_date": "2026-07-10",
+        "adult_count": 1,
+        "child_count": 0,
+        "infant_count": 0,
+        "currency": "CNY",
+        "currency_code": "0"
+      }
     }
   ]
 }

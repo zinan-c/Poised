@@ -65,6 +65,14 @@ func (client *JSONClient) PostJSON(ctx context.Context, pathOrURL string, payloa
 	return client.do(ctx, http.MethodPost, pathOrURL, bytes.NewReader(body), headers)
 }
 
+func (client *JSONClient) PostForm(ctx context.Context, pathOrURL string, values url.Values, headers map[string]string) (*http.Response, []byte, error) {
+	formHeaders := cloneHeaders(headers)
+	if formHeaders["Content-Type"] == "" {
+		formHeaders["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+	}
+	return client.do(ctx, http.MethodPost, pathOrURL, strings.NewReader(values.Encode()), formHeaders)
+}
+
 func (client *JSONClient) do(ctx context.Context, method string, pathOrURL string, body io.Reader, headers map[string]string) (*http.Response, []byte, error) {
 	requestURL, err := client.resolveURL(pathOrURL)
 	if err != nil {
