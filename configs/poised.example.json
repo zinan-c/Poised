@@ -2,6 +2,11 @@
   "http": {
     "addr": "127.0.0.1:8080"
   },
+  "database": {
+    "url": "",
+    "auto_migrate": true,
+    "max_conns": 5
+  },
   "scheduler": {
     "run_on_start": true
   },

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -9,28 +10,35 @@ import (
 
 	"github.com/zinan-c/Poised/internal/adapters"
 	"github.com/zinan-c/Poised/internal/core"
+	"github.com/zinan-c/Poised/internal/database"
 	"github.com/zinan-c/Poised/internal/runner"
 	"github.com/zinan-c/Poised/internal/store"
 )
 
-type Server struct {
-	jobs     []core.JobSpec
-	registry *adapters.Registry
-	runner   *runner.Runner
-	store    store.RunStore
-	logger   *slog.Logger
+type DatabaseChecker interface {
+	Check(ctx context.Context) (database.CheckResult, error)
 }
 
-func NewServer(jobs []core.JobSpec, registry *adapters.Registry, runner *runner.Runner, store store.RunStore, logger *slog.Logger) *Server {
+type Server struct {
+	jobs            []core.JobSpec
+	registry        *adapters.Registry
+	runner          *runner.Runner
+	store           store.RunStore
+	databaseChecker DatabaseChecker
+	logger          *slog.Logger
+}
+
+func NewServer(jobs []core.JobSpec, registry *adapters.Registry, runner *runner.Runner, store store.RunStore, databaseChecker DatabaseChecker, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Server{
-		jobs:     jobs,
-		registry: registry,
-		runner:   runner,
-		store:    store,
-		logger:   logger,
+		jobs:            jobs,
+		registry:        registry,
+		runner:          runner,
+		store:           store,
+		databaseChecker: databaseChecker,
+		logger:          logger,
 	}
 }
 
@@ -45,7 +53,26 @@ func (server *Server) Handler() http.Handler {
 }
 
 func (server *Server) handleHealth(responseWriter http.ResponseWriter, request *http.Request) {
-	writeJSON(responseWriter, http.StatusOK, map[string]string{"status": "ok"})
+	response := map[string]any{
+		"status":   "ok",
+		"database": "disabled",
+	}
+
+	if server.databaseChecker != nil {
+		checkResult, err := server.databaseChecker.Check(request.Context())
+		if err != nil {
+			writeJSON(responseWriter, http.StatusServiceUnavailable, map[string]any{
+				"status": "unavailable",
+				"database": map[string]any{
+					"error": err.Error(),
+				},
+			})
+			return
+		}
+		response["database"] = checkResult
+	}
+
+	writeJSON(responseWriter, http.StatusOK, response)
 }
 
 func (server *Server) handleAdapters(responseWriter http.ResponseWriter, request *http.Request) {

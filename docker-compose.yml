@@ -1,8 +1,33 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: poised
+      POSTGRES_USER: poised
+      POSTGRES_PASSWORD: poised
+    ports:
+      - "5432:5432"
+    volumes:
+      - poised-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poised -d poised"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   poised:
     build: .
     command: ["-config", "configs/poised.example.json"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       POISED_HTTP_ADDR: "0.0.0.0:8080"
+      POISED_DATABASE_URL: "postgres://poised:poised@postgres:5432/poised?sslmode=disable"
+      POISED_DATABASE_AUTO_MIGRATE: "true"
+      POISED_DATABASE_MAX_CONNS: "5"
     ports:
       - "8080:8080"
+
+volumes:
+  poised-postgres-data:

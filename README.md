@@ -10,12 +10,12 @@ registered adapters, and run results are stored through a storage interface.
 - Runtime: single backend process
 - Scheduling: in-process interval scheduler
 - API: Go standard `net/http`
-- Storage: in-memory implementation behind an interface
+- Storage: PostgreSQL schema foundation with an in-memory run store fallback
 - Adapter model: compile-time registry for the first version
 
-The code intentionally uses only the Go standard library for the initial frame,
-so the project can build and run without downloading dependencies. The next
-natural upgrades are Postgres storage, a cron scheduler, and Temporal workflows.
+The backend uses `pgx` for PostgreSQL connection pooling and keeps adapter
+execution decoupled from storage details. The next natural upgrades are
+Postgres-backed repositories, a cron scheduler, and Temporal workflows.
 
 ## Run
 
@@ -25,6 +25,7 @@ go run ./cmd/poised -config configs/poised.example.json
 
 The service listens on `127.0.0.1:8080` by default.
 Set `POISED_HTTP_ADDR=0.0.0.0:8080` when running in a container.
+Set `POISED_DATABASE_URL` to enable PostgreSQL initialization and schema checks.
 
 Useful endpoints:
 
@@ -52,6 +53,117 @@ make test
 make run
 make build
 docker compose up --build
+```
+
+## Database
+
+Poised can initialize and check a PostgreSQL schema at startup. Leave
+`database.url` empty to run without Postgres while using the in-memory run store.
+When enabled, `/healthz` also checks the live database connection and required
+tables.
+
+Environment variables:
+
+```bash
+POISED_DATABASE_URL=postgres://poised:poised@127.0.0.1:5432/poised?sslmode=disable
+POISED_DATABASE_AUTO_MIGRATE=true
+POISED_DATABASE_MAX_CONNS=5
+```
+
+Database responsibilities:
+
+- `monitor_tasks`: user-configurable monitoring jobs with generic JSON config.
+- `monitor_task_channels`: fixed channel selection and adapter-specific JSON config.
+- `monitor_runs`: execution attempts for task/channel adapter runs.
+- `monitor_records`: normalized generic outputs, from simple values to JSON tables.
+- `monitor_alert_rules`: optional rule configs evaluated from emitted records.
+- `monitor_alert_events`: alert lifecycle records tied back to rules and records.
+
+```mermaid
+erDiagram
+  monitor_tasks ||--o{ monitor_task_channels : has
+  monitor_tasks ||--o{ monitor_runs : creates
+  monitor_task_channels ||--o{ monitor_runs : executes
+  monitor_tasks ||--o{ monitor_records : emits
+  monitor_runs ||--o{ monitor_records : contains
+  monitor_tasks ||--o{ monitor_alert_rules : owns
+  monitor_alert_rules ||--o{ monitor_alert_events : triggers
+  monitor_records ||--o{ monitor_alert_events : references
+
+  monitor_tasks {
+    uuid id PK
+    text name
+    text description
+    boolean enabled
+    text status
+    integer interval_seconds
+    integer timeout_seconds
+    jsonb task_config
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  monitor_task_channels {
+    uuid id PK
+    uuid task_id FK
+    text channel
+    text adapter_name
+    boolean enabled
+    jsonb adapter_config
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  monitor_runs {
+    uuid id PK
+    uuid task_id FK
+    uuid channel_id FK
+    text adapter_name
+    text status
+    timestamptz started_at
+    timestamptz finished_at
+    integer duration_ms
+    text error_message
+    jsonb adapter_payload
+    jsonb summary
+  }
+
+  monitor_records {
+    uuid id PK
+    uuid task_id FK
+    uuid run_id FK
+    text channel
+    text adapter_name
+    text record_type
+    text record_key
+    timestamptz observed_at
+    jsonb payload
+    timestamptz created_at
+  }
+
+  monitor_alert_rules {
+    uuid id PK
+    uuid task_id FK
+    text name
+    boolean enabled
+    text rule_type
+    jsonb rule_config
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  monitor_alert_events {
+    uuid id PK
+    uuid alert_rule_id FK
+    uuid task_id FK
+    uuid record_id FK
+    text severity
+    text status
+    text message
+    jsonb payload
+    timestamptz triggered_at
+    timestamptz resolved_at
+  }
 ```
 
 ## Add An Adapter

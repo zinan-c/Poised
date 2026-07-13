@@ -18,6 +18,7 @@ import (
 	"github.com/zinan-c/Poised/internal/adapters/httpcheck"
 	"github.com/zinan-c/Poised/internal/api"
 	"github.com/zinan-c/Poised/internal/config"
+	"github.com/zinan-c/Poised/internal/database"
 	"github.com/zinan-c/Poised/internal/runner"
 	"github.com/zinan-c/Poised/internal/scheduler"
 	"github.com/zinan-c/Poised/internal/store"
@@ -42,10 +43,15 @@ func main() {
 	mustRegister(logger, registry, csair.New())
 	mustRegister(logger, registry, springair.New())
 
+	databaseInstance := openDatabase(logger, appConfig.Database)
+	if databaseInstance != nil {
+		defer databaseInstance.Close()
+	}
+
 	runStore := store.NewMemoryRunStore()
 	jobRunner := runner.New(registry, runStore, logger)
 	jobScheduler := scheduler.New(appConfig.Jobs, jobRunner, logger, appConfig.Scheduler.RunOnStart)
-	apiServer := api.NewServer(appConfig.Jobs, registry, jobRunner, runStore, logger)
+	apiServer := api.NewServer(appConfig.Jobs, registry, jobRunner, runStore, databaseInstance, logger)
 
 	rootContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -84,4 +90,43 @@ func mustRegister(logger *slog.Logger, registry *adapters.Registry, adapter adap
 		logger.Error("register adapter failed", "adapter", adapter.Name(), "error", err)
 		os.Exit(1)
 	}
+}
+
+func openDatabase(logger *slog.Logger, config config.DatabaseConfig) *database.DB {
+	if config.URL == "" {
+		logger.Info("database disabled; using in-memory run store")
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	db, err := database.Open(ctx, database.Config{
+		URL:      config.URL,
+		MaxConns: config.MaxConns,
+	})
+	if err != nil {
+		logger.Error("open database failed", "error", err)
+		os.Exit(1)
+	}
+
+	if config.AutoMigrate {
+		if err := db.Initialize(ctx); err != nil {
+			logger.Error("initialize database failed", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	checkResult, err := db.Check(ctx)
+	if err != nil {
+		logger.Error("check database failed", "error", err)
+		os.Exit(1)
+	}
+	if !checkResult.Initialized {
+		logger.Error("database schema is incomplete", "missing_tables", checkResult.MissingTables)
+		os.Exit(1)
+	}
+
+	logger.Info("database ready", "max_conns", config.MaxConns, "auto_migrate", config.AutoMigrate)
+	return db
 }
