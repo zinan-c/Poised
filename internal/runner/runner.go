@@ -2,10 +2,11 @@ package runner
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	"github.com/zinan-c/Poised/internal/adapters"
@@ -17,7 +18,6 @@ type Runner struct {
 	registry *adapters.Registry
 	store    store.RunStore
 	logger   *slog.Logger
-	sequence atomic.Uint64
 }
 
 func New(registry *adapters.Registry, store store.RunStore, logger *slog.Logger) *Runner {
@@ -110,6 +110,12 @@ func (runner *Runner) finish(ctx context.Context, run core.JobRun, result core.R
 }
 
 func (runner *Runner) nextRunID() string {
-	sequence := runner.sequence.Add(1)
-	return fmt.Sprintf("%d-%06d", time.Now().UnixNano(), sequence)
+	var bytes [16]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		binary.BigEndian.PutUint64(bytes[0:8], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(bytes[8:16], uint64(time.Now().UnixNano()))
+	}
+	bytes[6] = (bytes[6] & 0x0f) | 0x40
+	bytes[8] = (bytes[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", bytes[0:4], bytes[4:6], bytes[6:8], bytes[8:10], bytes[10:16])
 }

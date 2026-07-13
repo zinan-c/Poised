@@ -10,12 +10,12 @@ registered adapters, and run results are stored through a storage interface.
 - Runtime: single backend process
 - Scheduling: in-process interval scheduler
 - API: Go standard `net/http`
-- Storage: PostgreSQL schema foundation with an in-memory run store fallback
+- Storage: PostgreSQL repositories
 - Adapter model: compile-time registry for the first version
 
 The backend uses `pgx` for PostgreSQL connection pooling and keeps adapter
-execution decoupled from storage details. The next natural upgrades are
-Postgres-backed repositories, a cron scheduler, and Temporal workflows.
+execution decoupled from storage details. The next natural upgrades are a cron
+scheduler and Temporal workflows.
 
 ## Run
 
@@ -25,7 +25,7 @@ go run ./cmd/poised -config configs/poised.example.json
 
 The service listens on `127.0.0.1:8080` by default.
 Set `POISED_HTTP_ADDR=0.0.0.0:8080` when running in a container.
-Set `POISED_DATABASE_URL` to enable PostgreSQL initialization and schema checks.
+`POISED_DATABASE_URL` is required because runtime data is always persisted to PostgreSQL.
 
 Useful endpoints:
 
@@ -33,7 +33,9 @@ Useful endpoints:
 curl http://127.0.0.1:8080/healthz
 curl http://127.0.0.1:8080/v1/adapters
 curl http://127.0.0.1:8080/v1/jobs
+curl http://127.0.0.1:8080/v1/tasks
 curl http://127.0.0.1:8080/v1/runs
+curl http://127.0.0.1:8080/v1/records
 curl -X POST http://127.0.0.1:8080/v1/jobs/example-echo/runs
 ```
 
@@ -53,14 +55,17 @@ make test
 make run
 make build
 docker compose up --build
+make integration-postgres
 ```
 
 ## Database
 
-Poised can initialize and check a PostgreSQL schema at startup. Leave
-`database.url` empty to run without Postgres while using the in-memory run store.
-When enabled, `/healthz` also checks the live database connection and required
-tables.
+Poised initializes and checks a PostgreSQL schema at startup. `/healthz` also
+checks the live database connection and required tables.
+
+At startup, configured jobs are synced into `monitor_tasks`, job executions are
+saved into `monitor_runs`, and each run emits a generic `monitor_records` row
+containing the adapter result payload.
 
 Environment variables:
 
@@ -92,6 +97,7 @@ erDiagram
 
   monitor_tasks {
     uuid id PK
+    text key UK
     text name
     text description
     boolean enabled
@@ -199,7 +205,6 @@ flowchart LR
 
 Near-term upgrades:
 
-- Replace in-memory store with Postgres repositories.
 - Add `robfig/cron` for cron expressions.
 - Add notifier adapters for Slack, Feishu, email, and webhook.
 - Add Temporal when jobs need durable long-running workflows.

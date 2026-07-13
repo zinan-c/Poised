@@ -3,7 +3,7 @@
     "addr": "127.0.0.1:8080"
   },
   "database": {
-    "url": "",
+    "url": "postgres://poised:poised@127.0.0.1:5432/poised?sslmode=disable",
     "auto_migrate": true,
     "max_conns": 5
   },

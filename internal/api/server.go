@@ -24,19 +24,25 @@ type Server struct {
 	registry        *adapters.Registry
 	runner          *runner.Runner
 	store           store.RunStore
+	taskStore       store.TaskStore
+	recordStore     store.RecordStore
 	databaseChecker DatabaseChecker
 	logger          *slog.Logger
 }
 
-func NewServer(jobs []core.JobSpec, registry *adapters.Registry, runner *runner.Runner, store store.RunStore, databaseChecker DatabaseChecker, logger *slog.Logger) *Server {
+func NewServer(jobs []core.JobSpec, registry *adapters.Registry, runner *runner.Runner, runStore store.RunStore, databaseChecker DatabaseChecker, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	taskStore, _ := runStore.(store.TaskStore)
+	recordStore, _ := runStore.(store.RecordStore)
 	return &Server{
 		jobs:            jobs,
 		registry:        registry,
 		runner:          runner,
-		store:           store,
+		store:           runStore,
+		taskStore:       taskStore,
+		recordStore:     recordStore,
 		databaseChecker: databaseChecker,
 		logger:          logger,
 	}
@@ -47,7 +53,9 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /v1/adapters", server.handleAdapters)
 	mux.HandleFunc("GET /v1/jobs", server.handleJobs)
+	mux.HandleFunc("GET /v1/tasks", server.handleTasks)
 	mux.HandleFunc("GET /v1/runs", server.handleRuns)
+	mux.HandleFunc("GET /v1/records", server.handleRecords)
 	mux.HandleFunc("POST /v1/jobs/", server.handleJobRun)
 	return server.logRequests(mux)
 }
@@ -83,17 +91,30 @@ func (server *Server) handleJobs(responseWriter http.ResponseWriter, request *ht
 	writeJSON(responseWriter, http.StatusOK, server.jobs)
 }
 
-func (server *Server) handleRuns(responseWriter http.ResponseWriter, request *http.Request) {
-	limit := 50
-	if rawLimit := request.URL.Query().Get("limit"); rawLimit != "" {
-		parsedLimit, err := strconv.Atoi(rawLimit)
-		if err != nil {
-			writeError(responseWriter, http.StatusBadRequest, "limit must be a number")
-			return
-		}
-		limit = parsedLimit
+func (server *Server) handleTasks(responseWriter http.ResponseWriter, request *http.Request) {
+	if server.taskStore == nil {
+		writeError(responseWriter, http.StatusServiceUnavailable, "task store is not available")
+		return
 	}
 
+	limit, ok := parseLimit(responseWriter, request, 100)
+	if !ok {
+		return
+	}
+	tasks, err := server.taskStore.ListTasks(request.Context(), limit)
+	if err != nil {
+		writeError(responseWriter, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(responseWriter, http.StatusOK, tasks)
+}
+
+func (server *Server) handleRuns(responseWriter http.ResponseWriter, request *http.Request) {
+	limit, ok := parseLimit(responseWriter, request, 50)
+	if !ok {
+		return
+	}
 	runs, err := server.store.ListRuns(request.Context(), limit)
 	if err != nil {
 		writeError(responseWriter, http.StatusInternalServerError, err.Error())
@@ -101,6 +122,25 @@ func (server *Server) handleRuns(responseWriter http.ResponseWriter, request *ht
 	}
 
 	writeJSON(responseWriter, http.StatusOK, runs)
+}
+
+func (server *Server) handleRecords(responseWriter http.ResponseWriter, request *http.Request) {
+	if server.recordStore == nil {
+		writeError(responseWriter, http.StatusServiceUnavailable, "record store is not available")
+		return
+	}
+
+	limit, ok := parseLimit(responseWriter, request, 100)
+	if !ok {
+		return
+	}
+	records, err := server.recordStore.ListRecords(request.Context(), limit)
+	if err != nil {
+		writeError(responseWriter, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(responseWriter, http.StatusOK, records)
 }
 
 func (server *Server) handleJobRun(responseWriter http.ResponseWriter, request *http.Request) {
@@ -148,6 +188,19 @@ func parseRunPath(path string) (string, bool) {
 	}
 
 	return parts[0], true
+}
+
+func parseLimit(responseWriter http.ResponseWriter, request *http.Request, defaultLimit int) (int, bool) {
+	limit := defaultLimit
+	if rawLimit := request.URL.Query().Get("limit"); rawLimit != "" {
+		parsedLimit, err := strconv.Atoi(rawLimit)
+		if err != nil {
+			writeError(responseWriter, http.StatusBadRequest, "limit must be a number")
+			return 0, false
+		}
+		limit = parsedLimit
+	}
+	return limit, true
 }
 
 func writeJSON(responseWriter http.ResponseWriter, statusCode int, payload any) {

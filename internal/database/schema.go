@@ -14,6 +14,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS monitor_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     enabled BOOLEAN NOT NULL DEFAULT true,
@@ -27,6 +28,8 @@ CREATE TABLE IF NOT EXISTS monitor_tasks (
     CONSTRAINT monitor_tasks_interval_check CHECK (interval_seconds > 0),
     CONSTRAINT monitor_tasks_timeout_check CHECK (timeout_seconds > 0)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS monitor_tasks_key_uidx ON monitor_tasks (key);
 
 CREATE TABLE IF NOT EXISTS monitor_task_channels (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,7 +55,7 @@ CREATE TABLE IF NOT EXISTS monitor_runs (
     error_message TEXT NOT NULL DEFAULT '',
     adapter_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     summary JSONB NOT NULL DEFAULT '{}'::jsonb,
-    CONSTRAINT monitor_runs_status_check CHECK (status IN ('success', 'failed', 'timeout', 'skipped'))
+    CONSTRAINT monitor_runs_status_check CHECK (status IN ('success', 'failed', 'canceled', 'timeout', 'skipped'))
 );
 
 CREATE TABLE IF NOT EXISTS monitor_records (
@@ -95,6 +98,7 @@ CREATE TABLE IF NOT EXISTS monitor_alert_events (
 );
 
 CREATE INDEX IF NOT EXISTS monitor_tasks_enabled_status_idx ON monitor_tasks (enabled, status);
+CREATE INDEX IF NOT EXISTS monitor_tasks_key_idx ON monitor_tasks (key);
 CREATE INDEX IF NOT EXISTS monitor_tasks_task_config_gin_idx ON monitor_tasks USING GIN (task_config);
 
 CREATE INDEX IF NOT EXISTS monitor_task_channels_task_id_idx ON monitor_task_channels (task_id);
@@ -108,6 +112,7 @@ CREATE INDEX IF NOT EXISTS monitor_runs_adapter_payload_gin_idx ON monitor_runs 
 
 CREATE INDEX IF NOT EXISTS monitor_records_task_observed_idx ON monitor_records (task_id, observed_at DESC);
 CREATE INDEX IF NOT EXISTS monitor_records_run_id_idx ON monitor_records (run_id);
+CREATE UNIQUE INDEX IF NOT EXISTS monitor_records_run_type_key_uidx ON monitor_records (run_id, record_type, record_key) WHERE run_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS monitor_records_record_type_idx ON monitor_records (record_type);
 CREATE INDEX IF NOT EXISTS monitor_records_record_key_idx ON monitor_records (record_key);
 CREATE INDEX IF NOT EXISTS monitor_records_payload_gin_idx ON monitor_records USING GIN (payload);

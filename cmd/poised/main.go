@@ -18,6 +18,7 @@ import (
 	"github.com/zinan-c/Poised/internal/adapters/httpcheck"
 	"github.com/zinan-c/Poised/internal/api"
 	"github.com/zinan-c/Poised/internal/config"
+	"github.com/zinan-c/Poised/internal/core"
 	"github.com/zinan-c/Poised/internal/database"
 	"github.com/zinan-c/Poised/internal/runner"
 	"github.com/zinan-c/Poised/internal/scheduler"
@@ -44,11 +45,9 @@ func main() {
 	mustRegister(logger, registry, springair.New())
 
 	databaseInstance := openDatabase(logger, appConfig.Database)
-	if databaseInstance != nil {
-		defer databaseInstance.Close()
-	}
+	defer databaseInstance.Close()
 
-	runStore := store.NewMemoryRunStore()
+	runStore := newRunStore(logger, databaseInstance, appConfig.Jobs)
 	jobRunner := runner.New(registry, runStore, logger)
 	jobScheduler := scheduler.New(appConfig.Jobs, jobRunner, logger, appConfig.Scheduler.RunOnStart)
 	apiServer := api.NewServer(appConfig.Jobs, registry, jobRunner, runStore, databaseInstance, logger)
@@ -93,11 +92,6 @@ func mustRegister(logger *slog.Logger, registry *adapters.Registry, adapter adap
 }
 
 func openDatabase(logger *slog.Logger, config config.DatabaseConfig) *database.DB {
-	if config.URL == "" {
-		logger.Info("database disabled; using in-memory run store")
-		return nil
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -129,4 +123,20 @@ func openDatabase(logger *slog.Logger, config config.DatabaseConfig) *database.D
 
 	logger.Info("database ready", "max_conns", config.MaxConns, "auto_migrate", config.AutoMigrate)
 	return db
+}
+
+func newRunStore(logger *slog.Logger, db *database.DB, jobs []core.JobSpec) store.RunStore {
+	postgresStore := store.NewPostgresStore(db.Pool())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for _, job := range jobs {
+		if _, err := postgresStore.UpsertTask(ctx, job); err != nil {
+			logger.Error("sync monitor task failed", "job_id", job.ID, "error", err)
+			os.Exit(1)
+		}
+	}
+
+	logger.Info("monitor tasks synced", "count", len(jobs))
+	return postgresStore
 }

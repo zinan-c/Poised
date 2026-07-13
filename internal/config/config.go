@@ -76,6 +76,9 @@ func Load(path string) (Config, error) {
 }
 
 func validate(config Config) error {
+	if config.Database.URL == "" {
+		return fmt.Errorf("database url is required")
+	}
 	if config.Database.MaxConns < 0 {
 		return fmt.Errorf("database max_conns must be greater than or equal to 0")
 	}
