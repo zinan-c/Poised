@@ -19,6 +19,33 @@ scheduler and Temporal workflows.
 
 ## Run
 
+### Quick Local Start
+
+The simplest local path is:
+
+```bash
+make run-local
+```
+
+This script:
+
+1. Checks that Go and PostgreSQL tools are installed.
+2. Starts `postgresql@16` with Homebrew when it is installed but not running.
+3. Creates the `poised` PostgreSQL role and database when missing.
+4. Exports the local database environment variables.
+5. Starts the backend and serves the web console.
+
+Open the console:
+
+```bash
+open http://127.0.0.1:8080/
+```
+
+The web console can view health, adapters, tasks, recent runs, records, and
+trigger a configured job manually.
+
+### Manual Start
+
 ```bash
 go run ./cmd/poised -config configs/poised.example.json
 ```
@@ -53,6 +80,7 @@ Or use the convenience targets:
 ```bash
 make test
 make run
+make run-local
 make build
 docker compose up --build
 make integration-postgres

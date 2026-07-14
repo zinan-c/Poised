@@ -1,9 +1,12 @@
 APP_NAME := poised
 
-.PHONY: run test build fmt integration-postgres
+.PHONY: run run-local test build fmt integration-postgres
 
 run:
 	go run ./cmd/poised -config configs/poised.example.json
+
+run-local:
+	bash scripts/run_local.sh
 
 test:
 	go test ./...

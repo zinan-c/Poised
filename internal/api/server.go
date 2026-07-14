@@ -50,6 +50,8 @@ func NewServer(jobs []core.JobSpec, registry *adapters.Registry, runner *runner.
 
 func (server *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
+	mux.HandleFunc("GET /", server.handleIndex)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /v1/adapters", server.handleAdapters)
 	mux.HandleFunc("GET /v1/jobs", server.handleJobs)
@@ -58,6 +60,14 @@ func (server *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/records", server.handleRecords)
 	mux.HandleFunc("POST /v1/jobs/", server.handleJobRun)
 	return server.logRequests(mux)
+}
+
+func (server *Server) handleIndex(responseWriter http.ResponseWriter, request *http.Request) {
+	if request.URL.Path != "/" {
+		writeError(responseWriter, http.StatusNotFound, "route not found")
+		return
+	}
+	http.ServeFile(responseWriter, request, "web/index.html")
 }
 
 func (server *Server) handleHealth(responseWriter http.ResponseWriter, request *http.Request) {

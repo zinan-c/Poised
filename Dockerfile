@@ -11,6 +11,7 @@ FROM alpine:3.22
 WORKDIR /app
 COPY --from=build /out/poised /usr/local/bin/poised
 COPY configs ./configs
+COPY web ./web
 
 EXPOSE 8080
 ENTRYPOINT ["poised"]

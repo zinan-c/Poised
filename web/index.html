@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poised Monitor</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Poised</p>
+        <h1>Monitoring Console</h1>
+      </div>
+      <button id="refreshButton" class="button secondary">Refresh</button>
+    </header>
+
+    <main class="layout">
+      <section class="card hero">
+        <div>
+          <p class="eyebrow">System Health</p>
+          <h2 id="healthTitle">Checking...</h2>
+          <p id="healthDetail" class="muted">Waiting for API response.</p>
+        </div>
+        <span id="healthBadge" class="badge neutral">Unknown</span>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Manual Action</p>
+            <h2>Run a job</h2>
+          </div>
+        </div>
+        <div class="run-form">
+          <select id="jobSelect"></select>
+          <button id="runButton" class="button">Run Now</button>
+        </div>
+        <p id="runMessage" class="muted"></p>
+      </section>
+
+      <section class="card span-2">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Configured Tasks</p>
+            <h2>Tasks</h2>
+          </div>
+          <span id="taskCount" class="pill">0</span>
+        </div>
+        <div id="tasks" class="grid-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Adapter Registry</p>
+            <h2>Adapters</h2>
+          </div>
+        </div>
+        <div id="adapters" class="stack"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Recent Executions</p>
+            <h2>Runs</h2>
+          </div>
+        </div>
+        <div id="runs" class="stack"></div>
+      </section>
+
+      <section class="card span-2">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Normalized Output</p>
+            <h2>Records</h2>
+          </div>
+        </div>
+        <div id="records" class="table-wrap"></div>
+      </section>
+    </main>
+
+    <template id="emptyTemplate">
+      <div class="empty">No data yet.</div>
+    </template>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
