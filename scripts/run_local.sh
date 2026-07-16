@@ -3,6 +3,7 @@ set -euo pipefail
 
 http_addr="${POISED_HTTP_ADDR:-127.0.0.1:8080}"
 database_url="${POISED_DATABASE_URL:-postgres://poised:poised@127.0.0.1:5432/poised?sslmode=disable}"
+default_database_url="postgres://poised:poised@127.0.0.1:5432/poised?sslmode=disable"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -15,27 +16,36 @@ require_command go
 require_command psql
 require_command pg_isready
 
-if ! pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1 && brew list postgresql@16 >/dev/null 2>&1; then
-    echo "Starting postgresql@16 with Homebrew..."
-    brew services start postgresql@16 >/dev/null
-  else
-    echo "PostgreSQL is not reachable at 127.0.0.1:5432." >&2
-    echo "Install/start PostgreSQL first, or set POISED_DATABASE_URL to an existing database." >&2
-    exit 1
+if [[ "${database_url}" == "${default_database_url}" ]]; then
+  if ! pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
+    if command -v brew >/dev/null 2>&1 && brew list postgresql@16 >/dev/null 2>&1; then
+      echo "Starting postgresql@16 with Homebrew..."
+      brew services start postgresql@16 >/dev/null
+    else
+      echo "PostgreSQL is not reachable at 127.0.0.1:5432." >&2
+      echo "Install/start PostgreSQL first, or set POISED_DATABASE_URL to an existing database." >&2
+      exit 1
+    fi
   fi
-fi
 
-if ! psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='poised'" | grep -q 1; then
-  echo "Creating PostgreSQL role: poised"
-  createuser poised
-fi
+  if ! psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='poised'" | grep -q 1; then
+    echo "Creating PostgreSQL role: poised"
+    createuser poised
+    psql -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE poised WITH LOGIN PASSWORD 'poised';" >/dev/null
+  fi
 
-psql -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE poised WITH LOGIN PASSWORD 'poised';" >/dev/null
-
-if ! psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='poised'" | grep -q 1; then
-  echo "Creating PostgreSQL database: poised"
-  createdb -O poised poised
+  if ! psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='poised'" | grep -q 1; then
+    echo "Creating PostgreSQL database: poised"
+    createdb -O poised poised
+  fi
+else
+  if ! pg_isready -d "${database_url}" >/dev/null 2>&1; then
+    echo "PostgreSQL is not reachable for POISED_DATABASE_URL." >&2
+    echo "Check the configured database before starting Poised." >&2
+    exit 1
+  else
+    echo "Using external POISED_DATABASE_URL; skipping local provisioning."
+  fi
 fi
 
 echo "Starting Poised..."

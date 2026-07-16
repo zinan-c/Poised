@@ -215,7 +215,12 @@ func (adapter *Adapter) Run(ctx context.Context, input core.RunInput) (core.RunR
 	}
 
 	observations := adapter.observations(payload, response)
+	status := core.RunStatusSuccess
 	summary := fmt.Sprintf("ceair fare search found %d observations", len(observations))
+	if len(observations) == 0 {
+		status = core.RunStatusFailed
+		summary = "ceair fare search returned no observations"
+	}
 	data := map[string]any{
 		"route_name":        payload.RouteName,
 		"result_code":       response.ResultCode,
@@ -231,7 +236,7 @@ func (adapter *Adapter) Run(ctx context.Context, input core.RunInput) (core.RunR
 	}
 
 	return core.RunResult{
-		Status:  core.RunStatusSuccess,
+		Status:  status,
 		Summary: summary,
 		Data:    data,
 	}, nil

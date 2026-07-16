@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const maxResponseBodyBytes = 10 << 20
+
 func main() {
 	baseURL := flag.String("addr", "http://127.0.0.1:8080", "poised api base url")
 	flag.Parse()
@@ -76,9 +78,12 @@ func do(client *http.Client, request *http.Request) error {
 	}
 	defer response.Body.Close()
 
-	body, err := io.ReadAll(response.Body)
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBodyBytes+1))
 	if err != nil {
 		return err
+	}
+	if len(body) > maxResponseBodyBytes {
+		return fmt.Errorf("%s response exceeds %d bytes", request.URL, maxResponseBodyBytes)
 	}
 	if response.StatusCode >= 400 {
 		return fmt.Errorf("%s: %s", response.Status, strings.TrimSpace(string(body)))

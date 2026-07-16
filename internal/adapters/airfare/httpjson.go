@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const maxResponseBodyBytes = 10 << 20
+
 type HTTPDoer interface {
 	Do(request *http.Request) (*http.Response, error)
 }
@@ -96,9 +98,12 @@ func (client *JSONClient) do(ctx context.Context, method string, pathOrURL strin
 	}
 	defer response.Body.Close()
 
-	responseBody, err := io.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBodyBytes+1))
 	if err != nil {
 		return response, nil, err
+	}
+	if int64(len(responseBody)) > maxResponseBodyBytes {
+		return response, nil, fmt.Errorf("response from %s exceeds %d bytes", requestURL, maxResponseBodyBytes)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return response, responseBody, fmt.Errorf("unexpected status %d from %s", response.StatusCode, requestURL)

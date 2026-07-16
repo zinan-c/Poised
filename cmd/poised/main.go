@@ -43,6 +43,7 @@ func main() {
 	mustRegister(logger, registry, ceair.New())
 	mustRegister(logger, registry, csair.New())
 	mustRegister(logger, registry, springair.New())
+	ensureConfiguredAdapters(logger, registry, appConfig.Jobs)
 
 	databaseInstance := openDatabase(logger, appConfig.Database)
 	defer databaseInstance.Close()
@@ -61,6 +62,9 @@ func main() {
 		Addr:              appConfig.HTTP.Addr,
 		Handler:           apiServer.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
@@ -88,6 +92,15 @@ func mustRegister(logger *slog.Logger, registry *adapters.Registry, adapter adap
 	if err := registry.Register(adapter); err != nil {
 		logger.Error("register adapter failed", "adapter", adapter.Name(), "error", err)
 		os.Exit(1)
+	}
+}
+
+func ensureConfiguredAdapters(logger *slog.Logger, registry *adapters.Registry, jobs []core.JobSpec) {
+	for _, job := range jobs {
+		if _, exists := registry.Get(job.Adapter); !exists {
+			logger.Error("job references unregistered adapter", "job_id", job.ID, "adapter", job.Adapter)
+			os.Exit(1)
+		}
 	}
 }
 

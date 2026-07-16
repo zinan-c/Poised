@@ -7,16 +7,29 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/zinan-c/Poised/internal/adapters"
 	"github.com/zinan-c/Poised/internal/core"
 	"github.com/zinan-c/Poised/internal/database"
 	"github.com/zinan-c/Poised/internal/runner"
 	"github.com/zinan-c/Poised/internal/store"
+	"github.com/zinan-c/Poised/web"
 )
+
+const maxCollectionLimit = 500
 
 type DatabaseChecker interface {
 	Check(ctx context.Context) (database.CheckResult, error)
+}
+
+type JobView struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Adapter  string `json:"adapter"`
+	Enabled  bool   `json:"enabled"`
+	Interval string `json:"interval"`
+	Timeout  string `json:"timeout"`
 }
 
 type Server struct {
@@ -50,7 +63,7 @@ func NewServer(jobs []core.JobSpec, registry *adapters.Registry, runner *runner.
 
 func (server *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
+	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(web.Assets()))))
 	mux.HandleFunc("GET /", server.handleIndex)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /v1/adapters", server.handleAdapters)
@@ -67,7 +80,7 @@ func (server *Server) handleIndex(responseWriter http.ResponseWriter, request *h
 		writeError(responseWriter, http.StatusNotFound, "route not found")
 		return
 	}
-	http.ServeFile(responseWriter, request, "web/index.html")
+	http.ServeFileFS(responseWriter, request, web.Files(), "index.html")
 }
 
 func (server *Server) handleHealth(responseWriter http.ResponseWriter, request *http.Request) {
@@ -98,7 +111,18 @@ func (server *Server) handleAdapters(responseWriter http.ResponseWriter, request
 }
 
 func (server *Server) handleJobs(responseWriter http.ResponseWriter, request *http.Request) {
-	writeJSON(responseWriter, http.StatusOK, server.jobs)
+	views := make([]JobView, 0, len(server.jobs))
+	for _, job := range server.jobs {
+		views = append(views, JobView{
+			ID:       job.ID,
+			Name:     job.Name,
+			Adapter:  job.Adapter,
+			Enabled:  job.Enabled,
+			Interval: job.Interval,
+			Timeout:  job.Timeout,
+		})
+	}
+	writeJSON(responseWriter, http.StatusOK, views)
 }
 
 func (server *Server) handleTasks(responseWriter http.ResponseWriter, request *http.Request) {
@@ -113,7 +137,8 @@ func (server *Server) handleTasks(responseWriter http.ResponseWriter, request *h
 	}
 	tasks, err := server.taskStore.ListTasks(request.Context(), limit)
 	if err != nil {
-		writeError(responseWriter, http.StatusInternalServerError, err.Error())
+		server.logger.Error("list tasks failed", "error", err)
+		writeError(responseWriter, http.StatusInternalServerError, "list tasks failed")
 		return
 	}
 
@@ -127,7 +152,8 @@ func (server *Server) handleRuns(responseWriter http.ResponseWriter, request *ht
 	}
 	runs, err := server.store.ListRuns(request.Context(), limit)
 	if err != nil {
-		writeError(responseWriter, http.StatusInternalServerError, err.Error())
+		server.logger.Error("list runs failed", "error", err)
+		writeError(responseWriter, http.StatusInternalServerError, "list runs failed")
 		return
 	}
 
@@ -146,7 +172,8 @@ func (server *Server) handleRecords(responseWriter http.ResponseWriter, request 
 	}
 	records, err := server.recordStore.ListRecords(request.Context(), limit)
 	if err != nil {
-		writeError(responseWriter, http.StatusInternalServerError, err.Error())
+		server.logger.Error("list records failed", "error", err)
+		writeError(responseWriter, http.StatusInternalServerError, "list records failed")
 		return
 	}
 
@@ -167,7 +194,7 @@ func (server *Server) handleJobRun(responseWriter http.ResponseWriter, request *
 	}
 
 	run := server.runner.RunJob(request.Context(), job)
-	writeJSON(responseWriter, http.StatusAccepted, run)
+	writeJSON(responseWriter, http.StatusOK, run)
 }
 
 func (server *Server) findJob(jobID string) (core.JobSpec, bool) {
@@ -181,8 +208,15 @@ func (server *Server) findJob(jobID string) (core.JobSpec, bool) {
 
 func (server *Server) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		server.logger.Info("http request", "method", request.Method, "path", request.URL.Path)
-		next.ServeHTTP(responseWriter, request)
+		startedAt := time.Now()
+		recorder := &statusRecorder{ResponseWriter: responseWriter, statusCode: http.StatusOK}
+		next.ServeHTTP(recorder, request)
+		server.logger.Info("http request",
+			"method", request.Method,
+			"path", request.URL.Path,
+			"status", recorder.statusCode,
+			"duration_ms", time.Since(startedAt).Milliseconds(),
+		)
 	})
 }
 
@@ -208,9 +242,27 @@ func parseLimit(responseWriter http.ResponseWriter, request *http.Request, defau
 			writeError(responseWriter, http.StatusBadRequest, "limit must be a number")
 			return 0, false
 		}
+		if parsedLimit < 1 {
+			writeError(responseWriter, http.StatusBadRequest, "limit must be at least 1")
+			return 0, false
+		}
+		if parsedLimit > maxCollectionLimit {
+			writeError(responseWriter, http.StatusBadRequest, "limit must be at most 500")
+			return 0, false
+		}
 		limit = parsedLimit
 	}
 	return limit, true
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (recorder *statusRecorder) WriteHeader(statusCode int) {
+	recorder.statusCode = statusCode
+	recorder.ResponseWriter.WriteHeader(statusCode)
 }
 
 func writeJSON(responseWriter http.ResponseWriter, statusCode int, payload any) {

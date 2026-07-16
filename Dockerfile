@@ -4,6 +4,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 COPY cmd ./cmd
 COPY internal ./internal
+COPY web ./web
 RUN go build -o /out/poised ./cmd/poised
 
 FROM alpine:3.22

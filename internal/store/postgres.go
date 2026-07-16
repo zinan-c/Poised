@@ -16,6 +16,8 @@ type PostgresStore struct {
 	pool *pgxpool.Pool
 }
 
+const maxStoreLimit = 500
+
 type MonitorTask struct {
 	ID              string          `json:"id"`
 	Key             string          `json:"key"`
@@ -91,6 +93,9 @@ func (store *PostgresStore) ListTasks(ctx context.Context, limit int) ([]Monitor
 	}
 	if limit <= 0 {
 		limit = 100
+	}
+	if limit > maxStoreLimit {
+		limit = maxStoreLimit
 	}
 
 	rows, err := store.pool.Query(ctx, `
@@ -188,6 +193,9 @@ func (store *PostgresStore) ListRuns(ctx context.Context, limit int) ([]core.Job
 	if limit <= 0 {
 		limit = 50
 	}
+	if limit > maxStoreLimit {
+		limit = maxStoreLimit
+	}
 
 	rows, err := store.pool.Query(ctx, `
 SELECT
@@ -231,6 +239,9 @@ func (store *PostgresStore) ListRecords(ctx context.Context, limit int) ([]Monit
 	}
 	if limit <= 0 {
 		limit = 100
+	}
+	if limit > maxStoreLimit {
+		limit = maxStoreLimit
 	}
 
 	rows, err := store.pool.Query(ctx, `
@@ -397,6 +408,12 @@ func durationSeconds(raw string, fallback time.Duration) (int, error) {
 	duration, err := time.ParseDuration(raw)
 	if err != nil {
 		return 0, err
+	}
+	if duration <= 0 {
+		return 0, fmt.Errorf("duration must be positive")
+	}
+	if duration%time.Second != 0 {
+		return 0, fmt.Errorf("duration must be a whole number of seconds")
 	}
 	return int(duration.Seconds()), nil
 }

@@ -149,3 +149,56 @@ func TestCEAirValidatesRequiredPayload(t *testing.T) {
 		t.Fatalf("unexpected status: %s", result.Status)
 	}
 }
+
+func TestCEAirSearchReturnsFailedForEmptyObservations(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, httpRequest *http.Request) {
+		switch httpRequest.URL.Path {
+		case briefInfoEndpoint:
+			responseWriter.Header().Set("Content-Type", "application/json")
+			_, _ = responseWriter.Write([]byte(`{
+				"resultCode": "S200",
+				"resultMsg": "ok",
+				"currencyCode": "USD",
+				"data": {
+					"productInfos": [],
+					"flightItems": []
+				}
+			}`))
+		default:
+			responseWriter.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer testServer.Close()
+
+	payload, err := json.Marshal(Payload{
+		RouteName:    "sha-bjs-empty",
+		BaseURL:      testServer.URL,
+		SkipWarmup:   true,
+		DepCityCode:  "SHA",
+		DepCode:      []string{"SHA"},
+		ArrCityCode:  "BJS",
+		ArrCode:      []string{"PKX"},
+		DepDate:      "2026-07-09",
+		AdultCount:   1,
+		ChildCount:   0,
+		InfantCount:  0,
+		CurrencyCode: "USD",
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	result, err := New().Run(context.Background(), core.RunInput{
+		JobID:   "ceair-empty-test",
+		Payload: payload,
+	})
+	if err != nil {
+		t.Fatalf("run adapter: %v", err)
+	}
+	if result.Status != core.RunStatusFailed {
+		t.Fatalf("unexpected status: %s", result.Status)
+	}
+	if result.Summary != "ceair fare search returned no observations" {
+		t.Fatalf("unexpected summary: %s", result.Summary)
+	}
+}

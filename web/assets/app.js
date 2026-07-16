@@ -32,33 +32,50 @@ async function postJSON(path) {
 
 async function refreshAll() {
   $("#refreshButton").disabled = true;
-  try {
-    const [health, adapters, jobs, tasks, runs, records] = await Promise.all([
-      getJSON("/healthz"),
-      getJSON("/v1/adapters"),
-      getJSON("/v1/jobs"),
-      getJSON("/v1/tasks?limit=50"),
-      getJSON("/v1/runs?limit=8"),
-      getJSON("/v1/records?limit=10"),
-    ]);
+  const results = await Promise.allSettled([
+    getJSON("/healthz"),
+    getJSON("/v1/adapters"),
+    getJSON("/v1/jobs"),
+    getJSON("/v1/tasks?limit=50"),
+    getJSON("/v1/runs?limit=8"),
+    getJSON("/v1/records?limit=10"),
+  ]);
 
-    state.adapters = adapters;
-    state.jobs = jobs;
-    state.tasks = tasks;
-    state.runs = runs;
-    state.records = records;
+  applyResult(results[0], renderHealth, renderHealthError);
+  applyResult(results[1], renderAdapters, (error) => renderPanelError("#adapters", error));
+  applyResult(results[2], renderJobs, (error) => {
+    renderJobLoadError(error);
+    $("#runButton").disabled = true;
+  });
+  applyResult(results[3], renderTasks, (error) => renderPanelError("#tasks", error));
+  applyResult(results[4], renderRuns, (error) => renderPanelError("#runs", error));
+  applyResult(results[5], renderRecords, (error) => renderPanelError("#records", error));
+  $("#refreshButton").disabled = false;
+}
 
-    renderHealth(health);
-    renderJobs(jobs);
-    renderAdapters(adapters);
-    renderTasks(tasks);
-    renderRuns(runs);
-    renderRecords(records);
-  } catch (error) {
-    renderHealthError(error);
-  } finally {
-    $("#refreshButton").disabled = false;
+function applyResult(result, onFulfilled, onRejected) {
+  if (result.status === "fulfilled") {
+    onFulfilled(result.value);
+    return;
   }
+  onRejected(result.reason);
+}
+
+function renderPanelError(selector, error) {
+  const container = $(selector);
+  container.innerHTML = "";
+  const node = emptyNode();
+  node.textContent = error.message;
+  container.append(node);
+}
+
+function renderJobLoadError(error) {
+  const select = $("#jobSelect");
+  select.innerHTML = "";
+  const option = document.createElement("option");
+  option.value = "";
+  option.textContent = error.message;
+  select.append(option);
 }
 
 function renderHealth(health) {

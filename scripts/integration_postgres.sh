@@ -22,6 +22,14 @@ cleanup() {
 trap cleanup EXIT
 
 docker compose -p "${project_name}" up -d postgres
+for _ in {1..60}; do
+  if docker compose -p "${project_name}" exec -T postgres pg_isready -U poised -d poised >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+docker compose -p "${project_name}" exec -T postgres pg_isready -U poised -d poised >/dev/null
 
 export GOCACHE="${GOCACHE:-/tmp/poised-go-cache}"
 export POISED_HTTP_ADDR="${http_addr}"
