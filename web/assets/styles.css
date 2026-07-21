@@ -107,9 +107,10 @@ h2 {
 }
 
 .button,
-select {
+input,
+select,
+textarea {
   border: 0;
-  border-radius: 999px;
   font: inherit;
 }
 
@@ -145,17 +146,49 @@ select {
   gap: 0.75rem;
 }
 
-select {
+input,
+select,
+textarea {
   flex: 1;
   min-width: 0;
   background: #f4f6fb;
   color: var(--text);
   padding: 0.75rem 0.9rem;
+  border-radius: 0.8rem;
   outline: 1px solid transparent;
 }
 
-select:focus {
+select {
+  border-radius: 999px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   outline-color: rgba(59, 108, 255, 0.35);
+}
+
+textarea {
+  grid-column: span 2;
+  resize: vertical;
+}
+
+.task-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.checkline {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.5rem;
+}
+
+.checkline input {
+  flex: 0;
 }
 
 .badge,
@@ -214,6 +247,18 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.button.small {
+  font-size: 0.78rem;
+  padding: 0.45rem 0.65rem;
 }
 
 .chip {
@@ -305,8 +350,17 @@ pre {
 
   .topbar,
   .hero,
-  .run-form {
+  .run-form,
+  .task-form {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .task-form {
+    display: flex;
+  }
+
+  textarea {
+    grid-column: span 1;
   }
 }

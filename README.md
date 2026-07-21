@@ -42,7 +42,8 @@ open http://127.0.0.1:8080/
 ```
 
 The web console can view health, adapters, tasks, recent runs, records, and
-trigger a configured job manually.
+trigger a configured job manually. It can also create simple tasks and
+pause/resume/archive existing tasks.
 
 ### Manual Start
 
@@ -61,6 +62,8 @@ curl http://127.0.0.1:8080/healthz
 curl http://127.0.0.1:8080/v1/adapters
 curl http://127.0.0.1:8080/v1/jobs
 curl http://127.0.0.1:8080/v1/tasks
+curl -X POST http://127.0.0.1:8080/v1/tasks
+curl http://127.0.0.1:8080/v1/tasks/example-echo/channels
 curl http://127.0.0.1:8080/v1/runs
 curl http://127.0.0.1:8080/v1/records
 curl -X POST http://127.0.0.1:8080/v1/jobs/example-echo/runs
@@ -91,9 +94,48 @@ make integration-postgres
 Poised initializes and checks a PostgreSQL schema at startup. `/healthz` also
 checks the live database connection and required tables.
 
-At startup, configured jobs are synced into `monitor_tasks`, job executions are
-saved into `monitor_runs`, and each run emits a generic `monitor_records` row
-containing the adapter result payload.
+The database is the runtime task source. JSON config is used as a local seed:
+startup syncs configured jobs into `monitor_tasks` and default
+`monitor_task_channels`, then the scheduler continuously reads runnable
+task/channel pairs from PostgreSQL. Job executions are saved into `monitor_runs`,
+and each run emits a generic `monitor_records` row containing the adapter result
+payload.
+
+Task APIs:
+
+```bash
+curl http://127.0.0.1:8080/v1/tasks
+curl -X POST http://127.0.0.1:8080/v1/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "key": "my-echo",
+    "name": "My Echo",
+    "enabled": true,
+    "status": "active",
+    "interval_seconds": 60,
+    "timeout_seconds": 10,
+    "task_config": {}
+  }'
+curl -X POST http://127.0.0.1:8080/v1/tasks/my-echo/pause
+curl -X POST http://127.0.0.1:8080/v1/tasks/my-echo/resume
+curl -X POST http://127.0.0.1:8080/v1/tasks/my-echo/archive
+```
+
+Channel APIs:
+
+```bash
+curl http://127.0.0.1:8080/v1/tasks/my-echo/channels
+curl -X POST http://127.0.0.1:8080/v1/tasks/my-echo/channels \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "channel": "primary",
+    "adapter_name": "echo",
+    "enabled": true,
+    "adapter_config": {"message": "hello"}
+  }'
+curl -X POST http://127.0.0.1:8080/v1/tasks/my-echo/channels/primary/disable
+curl -X POST http://127.0.0.1:8080/v1/tasks/my-echo/channels/primary/enable
+```
 
 Environment variables:
 

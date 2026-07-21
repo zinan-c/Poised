@@ -6,13 +6,16 @@ import (
 )
 
 type JobSpec struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Adapter  string          `json:"adapter"`
-	Enabled  bool            `json:"enabled"`
-	Interval string          `json:"interval"`
-	Timeout  string          `json:"timeout"`
-	Payload  json.RawMessage `json:"payload"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Adapter   string          `json:"adapter"`
+	Enabled   bool            `json:"enabled"`
+	Interval  string          `json:"interval"`
+	Timeout   string          `json:"timeout"`
+	Payload   json.RawMessage `json:"payload"`
+	TaskID    string          `json:"task_id,omitempty"`
+	ChannelID string          `json:"channel_id,omitempty"`
+	Channel   string          `json:"channel,omitempty"`
 }
 
 type RunInput struct {
@@ -38,6 +41,8 @@ type RunResult struct {
 type JobRun struct {
 	ID             string    `json:"id"`
 	JobID          string    `json:"job_id"`
+	ChannelID      string    `json:"channel_id,omitempty"`
+	Channel        string    `json:"channel,omitempty"`
 	Adapter        string    `json:"adapter"`
 	Status         RunStatus `json:"status"`
 	StartedAt      time.Time `json:"started_at"`

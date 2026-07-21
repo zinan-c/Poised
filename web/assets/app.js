@@ -22,7 +22,15 @@ async function getJSON(path) {
 }
 
 async function postJSON(path) {
-  const response = await fetch(path, { method: "POST" });
+  return sendJSON(path, "POST");
+}
+
+async function sendJSON(path, method, body) {
+  const response = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`${response.status} ${response.statusText}: ${body}`);
@@ -101,14 +109,15 @@ function renderJobs(jobs) {
   select.innerHTML = "";
   for (const job of jobs) {
     const option = document.createElement("option");
-    option.value = job.id;
-    option.textContent = `${job.name || job.id} (${job.adapter})`;
+    option.value = `${job.id}|${job.channel || ""}`;
+    option.textContent = `${job.name || job.id} / ${job.channel || job.adapter} (${job.adapter})`;
     select.append(option);
   }
   $("#runButton").disabled = jobs.length === 0;
 }
 
 function renderAdapters(adapters) {
+  renderAdapterOptions(adapters);
   const container = $("#adapters");
   container.innerHTML = "";
   if (!adapters.length) {
@@ -127,6 +136,18 @@ function renderAdapters(adapters) {
   }
 }
 
+function renderAdapterOptions(adapters) {
+  const select = $("#taskAdapter");
+  if (!select) return;
+  select.innerHTML = "";
+  for (const adapter of adapters) {
+    const option = document.createElement("option");
+    option.value = adapter.name;
+    option.textContent = `${adapter.name} (${adapter.kind})`;
+    select.append(option);
+  }
+}
+
 function renderTasks(tasks) {
   const container = $("#tasks");
   container.innerHTML = "";
@@ -137,18 +158,25 @@ function renderTasks(tasks) {
   }
 
   for (const task of tasks) {
-    container.append(
-      item({
-        title: task.name || task.key,
-        subtitle: task.key,
-        chips: [
-          task.status,
-          task.enabled ? "enabled" : "disabled",
-          `${task.interval_seconds}s interval`,
-          `${task.timeout_seconds}s timeout`,
-        ],
-      }),
-    );
+    const node = item({
+      title: task.name || task.key,
+      subtitle: task.key,
+      chips: [
+        task.status,
+        task.enabled ? "enabled" : "disabled",
+        `${task.interval_seconds}s interval`,
+        `${task.timeout_seconds}s timeout`,
+      ],
+    });
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    actions.innerHTML = `
+      <button class="button small secondary" data-action="resume" data-task="${escapeHTML(task.key)}">Resume</button>
+      <button class="button small secondary" data-action="pause" data-task="${escapeHTML(task.key)}">Pause</button>
+      <button class="button small secondary" data-action="archive" data-task="${escapeHTML(task.key)}">Archive</button>
+    `;
+    node.append(actions);
+    container.append(node);
   }
 }
 
@@ -225,19 +253,64 @@ function item({ title, subtitle, chips }) {
 }
 
 async function runSelectedJob() {
-  const jobID = $("#jobSelect").value;
+  const [jobID, channel] = $("#jobSelect").value.split("|");
   if (!jobID) return;
 
   $("#runButton").disabled = true;
   $("#runMessage").textContent = `Running ${jobID}...`;
   try {
-    const run = await postJSON(`/v1/jobs/${encodeURIComponent(jobID)}/runs`);
-    $("#runMessage").textContent = `Run ${run.status}: ${run.id}`;
+    const suffix = channel ? `?channel=${encodeURIComponent(channel)}` : "";
+    const result = await postJSON(`/v1/jobs/${encodeURIComponent(jobID)}/runs${suffix}`);
+    $("#runMessage").textContent = `Started ${result.runs.length} run(s).`;
     await refreshAll();
   } catch (error) {
     $("#runMessage").textContent = error.message;
   } finally {
     $("#runButton").disabled = false;
+  }
+}
+
+async function createTask(event) {
+  event.preventDefault();
+  $("#taskFormMessage").textContent = "Creating task...";
+  try {
+    const payload = JSON.parse($("#taskPayload").value || "{}");
+    const task = await sendJSON("/v1/tasks", "POST", {
+      key: $("#taskKey").value.trim(),
+      name: $("#taskName").value.trim(),
+      description: "",
+      enabled: $("#taskEnabled").checked,
+      status: $("#taskEnabled").checked ? "active" : "paused",
+      interval_seconds: Number($("#taskInterval").value),
+      timeout_seconds: Number($("#taskTimeout").value),
+      task_config: {},
+    });
+    await sendJSON(`/v1/tasks/${encodeURIComponent(task.key)}/channels`, "POST", {
+      channel: $("#taskChannel").value.trim(),
+      adapter_name: $("#taskAdapter").value,
+      enabled: $("#taskEnabled").checked,
+      adapter_config: payload,
+    });
+    $("#taskFormMessage").textContent = `Created ${task.key}.`;
+    await refreshAll();
+  } catch (error) {
+    $("#taskFormMessage").textContent = error.message;
+  }
+}
+
+async function handleTaskAction(event) {
+  const button = event.target.closest("[data-action][data-task]");
+  if (!button) return;
+  const taskKey = button.dataset.task;
+  const action = button.dataset.action;
+  button.disabled = true;
+  try {
+    await postJSON(`/v1/tasks/${encodeURIComponent(taskKey)}/${action}`);
+    await refreshAll();
+  } catch (error) {
+    $("#taskFormMessage").textContent = error.message;
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -263,4 +336,6 @@ function escapeHTML(value) {
 
 $("#refreshButton").addEventListener("click", refreshAll);
 $("#runButton").addEventListener("click", runSelectedJob);
+$("#taskForm").addEventListener("submit", createTask);
+$("#tasks").addEventListener("click", handleTaskAction);
 refreshAll();

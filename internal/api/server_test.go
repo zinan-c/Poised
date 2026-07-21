@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -32,17 +33,20 @@ func TestJobsEndpointReturnsSanitizedJobs(t *testing.T) {
 	if err := registry.Register(echo.New()); err != nil {
 		t.Fatalf("register adapter: %v", err)
 	}
-	runStore := store.NewMemoryRunStore()
+	runStore := &apiTestStore{
+		MemoryRunStore: store.NewMemoryRunStore(),
+		jobs: []core.JobSpec{{
+			ID:       "secret-job",
+			Name:     "Secret Job",
+			Adapter:  "echo",
+			Enabled:  true,
+			Interval: "30s",
+			Timeout:  "10s",
+			Payload:  []byte(`{"token":"secret"}`),
+		}},
+	}
 	jobRunner := runner.New(registry, runStore, nil)
-	server := NewServer([]core.JobSpec{{
-		ID:       "secret-job",
-		Name:     "Secret Job",
-		Adapter:  "echo",
-		Enabled:  true,
-		Interval: "30s",
-		Timeout:  "10s",
-		Payload:  []byte(`{"token":"secret"}`),
-	}}, registry, jobRunner, runStore, nil, nil)
+	server := NewServer(registry, jobRunner, runStore, nil, nil)
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)
@@ -59,4 +63,13 @@ func TestJobsEndpointReturnsSanitizedJobs(t *testing.T) {
 	if _, exists := jobs[0]["payload"]; exists {
 		t.Fatalf("jobs response should not include payload: %s", response.Body.String())
 	}
+}
+
+type apiTestStore struct {
+	*store.MemoryRunStore
+	jobs []core.JobSpec
+}
+
+func (store *apiTestStore) ListRunnableJobs(ctx context.Context) ([]core.JobSpec, error) {
+	return store.jobs, nil
 }

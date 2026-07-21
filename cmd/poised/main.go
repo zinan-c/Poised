@@ -50,8 +50,8 @@ func main() {
 
 	runStore := newRunStore(logger, databaseInstance, appConfig.Jobs)
 	jobRunner := runner.New(registry, runStore, logger)
-	jobScheduler := scheduler.New(appConfig.Jobs, jobRunner, logger, appConfig.Scheduler.RunOnStart)
-	apiServer := api.NewServer(appConfig.Jobs, registry, jobRunner, runStore, databaseInstance, logger)
+	jobScheduler := scheduler.New(runStore, jobRunner, logger, appConfig.Scheduler.RunOnStart)
+	apiServer := api.NewServer(registry, jobRunner, runStore, databaseInstance, logger)
 
 	rootContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -138,7 +138,7 @@ func openDatabase(logger *slog.Logger, config config.DatabaseConfig) *database.D
 	return db
 }
 
-func newRunStore(logger *slog.Logger, db *database.DB, jobs []core.JobSpec) store.RunStore {
+func newRunStore(logger *slog.Logger, db *database.DB, jobs []core.JobSpec) *store.PostgresStore {
 	postgresStore := store.NewPostgresStore(db.Pool())
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

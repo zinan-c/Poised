@@ -40,6 +40,8 @@ func (runner *Runner) RunJob(ctx context.Context, job core.JobSpec) (finishedRun
 	run := core.JobRun{
 		ID:        runner.nextRunID(),
 		JobID:     job.ID,
+		ChannelID: job.ChannelID,
+		Channel:   job.Channel,
 		Adapter:   job.Adapter,
 		Status:    core.RunStatusFailed,
 		StartedAt: startedAt,
@@ -82,7 +84,9 @@ func (runner *Runner) RunJob(ctx context.Context, job core.JobSpec) (finishedRun
 		JobID:   job.ID,
 		Payload: job.Payload,
 		Metadata: map[string]any{
-			"job_name": job.Name,
+			"job_name":   job.Name,
+			"channel":    job.Channel,
+			"channel_id": job.ChannelID,
 		},
 	})
 	if err != nil {

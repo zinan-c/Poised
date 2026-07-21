@@ -42,6 +42,27 @@
       <section class="card span-2">
         <div class="section-title">
           <div>
+            <p class="eyebrow">Task Builder</p>
+            <h2>Create a task</h2>
+          </div>
+        </div>
+        <form id="taskForm" class="task-form">
+          <input id="taskKey" placeholder="task key, e.g. my-http-check" required />
+          <input id="taskName" placeholder="display name" required />
+          <input id="taskInterval" type="number" min="5" value="60" />
+          <input id="taskTimeout" type="number" min="1" value="10" />
+          <select id="taskAdapter"></select>
+          <input id="taskChannel" placeholder="channel, e.g. primary" value="primary" />
+          <textarea id="taskPayload" rows="5">{"message":"hello from web"}</textarea>
+          <label class="checkline"><input id="taskEnabled" type="checkbox" checked /> enabled</label>
+          <button class="button" type="submit">Create Task</button>
+        </form>
+        <p id="taskFormMessage" class="muted"></p>
+      </section>
+
+      <section class="card span-2">
+        <div class="section-title">
+          <div>
             <p class="eyebrow">Configured Tasks</p>
             <h2>Tasks</h2>
           </div>
